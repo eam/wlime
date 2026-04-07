@@ -65,6 +65,10 @@ fade_duration_ms = 150
 sparkle = true
 ```
 
+## Screenshots
+
+![wlime over doom](wlime-doom.png)
+
 ## Architecture
 
 wlime is a standalone Wayland client (not a Hyprland plugin) using standard protocols:
