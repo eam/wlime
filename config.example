@@ -1,0 +1,22 @@
+# wlime configuration
+# Copy to ~/.config/wlime/config
+
+# Language / input method
+# Supported: pinyin
+# Planned: jyutping (Cantonese), japanese (anthy/mozc), korean (libhangul)
+language = pinyin
+
+# Always copy committed text to clipboard (true/false)
+clipboard_always = true
+
+# Sound effects (true/false)
+sounds = true
+
+# Custom sound directory (default: ~/.config/wlime/sounds)
+# sound_dir = /path/to/sounds
+
+# Fade animation (true/false)
+animate = true
+
+# Fade duration in milliseconds
+fade_duration_ms = 150
