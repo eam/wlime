@@ -267,6 +267,42 @@ InputEngine *create_rime_engine(const std::string &schema) {
     return e;
 }
 
+void list_rime_schemas(std::vector<std::pair<std::string, std::string>> &out) {
+    // Initialize RIME just enough to list schemas
+    RimeApi *api = rime_get_api();
+    if (!api) return;
+
+    if (!g_rime_initialized) {
+        RIME_STRUCT(RimeTraits, traits);
+        traits.shared_data_dir = "/usr/share/rime-data";
+        static std::string user_dir;
+        const char *home = getenv("HOME");
+        if (home)
+            user_dir = std::string(home) + "/.local/share/wlime/rime";
+        else
+            user_dir = "/tmp/wlime-rime";
+        traits.user_data_dir = user_dir.c_str();
+        traits.distribution_name = "wlime";
+        traits.distribution_code_name = "wlime";
+        traits.distribution_version = "0.1.0";
+        traits.app_name = "rime.wlime";
+        traits.min_log_level = 2;
+        traits.log_dir = "";
+        api->setup(&traits);
+        api->initialize(&traits);
+        api->start_maintenance(False);
+        api->join_maintenance_thread();
+        g_rime_initialized = true;
+    }
+
+    RimeSchemaList list;
+    if (api->get_schema_list(&list)) {
+        for (size_t i = 0; i < list.size; i++)
+            out.push_back({list.list[i].schema_id, list.list[i].name});
+        api->free_schema_list(&list);
+    }
+}
+
 #else
 
 InputEngine *create_rime_engine(const std::string &schema) {
@@ -274,5 +310,7 @@ InputEngine *create_rime_engine(const std::string &schema) {
     fprintf(stderr, "[wlime] rime support not compiled (librime not found)\n");
     return nullptr;
 }
+
+void list_rime_schemas(std::vector<std::pair<std::string, std::string>> &) {}
 
 #endif

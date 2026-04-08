@@ -47,3 +47,6 @@ public:
 // Factory: creates engine based on language config string.
 // Returns nullptr on failure (logs the reason).
 InputEngine *create_engine(const std::string &language);
+
+// Print all available languages to stdout, one per line.
+void list_languages();

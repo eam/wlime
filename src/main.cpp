@@ -11,6 +11,7 @@ static void print_usage() {
     fprintf(stderr, "  toggle              Toggle composition mode\n");
     fprintf(stderr, "  status              Print status as JSON\n");
     fprintf(stderr, "  switch <language>   Switch input language\n");
+    fprintf(stderr, "  languages           List available languages\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -20,6 +21,10 @@ int main(int argc, char *argv[]) {
             return control_send("toggle");
         if (strcmp(argv[1], "status") == 0)
             return control_send("status");
+        if (strcmp(argv[1], "languages") == 0) {
+            list_languages();
+            return 0;
+        }
         if (strcmp(argv[1], "switch") == 0) {
             if (argc < 3) {
                 fprintf(stderr, "wlime switch: missing language argument\n");

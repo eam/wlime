@@ -1,11 +1,13 @@
 #include "engine.h"
 #include <cstdio>
+#include <utility>
 
 // Engine factories (defined in their respective files)
 InputEngine *create_pinyin_engine();
 InputEngine *create_hangul_engine();
 InputEngine *create_anthy_engine(int mode); // 0=kanji, 1=hiragana, 2=katakana
 InputEngine *create_rime_engine(const std::string &schema);
+void list_rime_schemas(std::vector<std::pair<std::string, std::string>> &out);
 
 InputEngine *create_engine(const std::string &language) {
     if (language == "pinyin")
@@ -32,4 +34,22 @@ InputEngine *create_engine(const std::string &language) {
     fprintf(stderr, "[wlime] unknown language '%s'\n", language.c_str());
     fprintf(stderr, "[wlime] supported: pinyin, korean, japanese, hiragana, katakana, rime:<schema>\n");
     return nullptr;
+}
+
+void list_languages() {
+    printf("pinyin\n");
+#ifdef HAVE_HANGUL
+    printf("korean\n");
+#endif
+#ifdef HAVE_ANTHY
+    printf("japanese\n");
+    printf("hiragana\n");
+    printf("katakana\n");
+#endif
+#ifdef HAVE_RIME
+    std::vector<std::pair<std::string, std::string>> schemas;
+    list_rime_schemas(schemas);
+    for (auto &s : schemas)
+        printf("rime:%s\n", s.first.c_str());
+#endif
 }
