@@ -4,7 +4,7 @@
 // Engine factories (defined in their respective files)
 InputEngine *create_pinyin_engine();
 InputEngine *create_hangul_engine();
-InputEngine *create_anthy_engine();
+InputEngine *create_anthy_engine(int mode); // 0=kanji, 1=hiragana, 2=katakana
 InputEngine *create_rime_engine(const std::string &schema);
 
 InputEngine *create_engine(const std::string &language) {
@@ -12,8 +12,12 @@ InputEngine *create_engine(const std::string &language) {
         return create_pinyin_engine();
     if (language == "korean")
         return create_hangul_engine();
-    if (language == "japanese")
-        return create_anthy_engine();
+    if (language == "japanese" || language == "japanese-kanji")
+        return create_anthy_engine(0);
+    if (language == "hiragana" || language == "japanese-hiragana")
+        return create_anthy_engine(1);
+    if (language == "katakana" || language == "japanese-katakana")
+        return create_anthy_engine(2);
 
     // "rime:schema_id" — e.g. "rime:luna_pinyin", "rime:jyut6ping3"
     if (language.compare(0, 5, "rime:") == 0) {
@@ -26,6 +30,6 @@ InputEngine *create_engine(const std::string &language) {
     }
 
     fprintf(stderr, "[wlime] unknown language '%s'\n", language.c_str());
-    fprintf(stderr, "[wlime] supported: pinyin, korean, japanese, rime:<schema>\n");
+    fprintf(stderr, "[wlime] supported: pinyin, korean, japanese, hiragana, katakana, rime:<schema>\n");
     return nullptr;
 }

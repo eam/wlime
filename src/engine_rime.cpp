@@ -16,6 +16,7 @@ class RimeEngine : public InputEngine {
     std::vector<Candidate> candidates_;
     std::string preedit_;
     std::string raw_input_;
+    std::string pending_commit_;
 
 public:
     RimeEngine(const std::string &schema) : schema_id(schema) {
@@ -116,6 +117,8 @@ public:
 
         Bool handled = api->process_key(session, keycode, mask);
 
+        // Check if RIME produced a commit (e.g. space in Japanese triggers conversion+commit)
+        drain_commit();
         sync_state();
         return handled;
     }
@@ -176,7 +179,13 @@ public:
     }
 
     bool empty() const override {
-        return preedit_.empty();
+        return preedit_.empty() && pending_commit_.empty();
+    }
+
+    std::string check_commit() override {
+        std::string result;
+        std::swap(result, pending_commit_);
+        return result;
     }
 
     const char *display_name() const override {
@@ -188,6 +197,15 @@ public:
     }
 
 private:
+    void drain_commit() {
+        RIME_STRUCT(RimeCommit, commit);
+        if (api->get_commit(session, &commit)) {
+            if (commit.text)
+                pending_commit_ += commit.text;
+            api->free_commit(&commit);
+        }
+    }
+
     void sync_state() {
         candidates_.clear();
         preedit_.clear();

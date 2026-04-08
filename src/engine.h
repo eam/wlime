@@ -33,6 +33,10 @@ public:
     // Whether the composition buffer is empty.
     virtual bool empty() const = 0;
 
+    // Drain any text committed internally by the engine (e.g. RIME process_key).
+    // Returns empty string if nothing was committed.
+    virtual std::string check_commit() { return ""; }
+
     // Display name for the overlay idle screen (e.g. "pinyin", "한국어", "日本語").
     virtual const char *display_name() const = 0;
 

@@ -2,7 +2,11 @@
 # Copy to ~/.config/wlime/config
 
 # Language / input method
-# Supported: pinyin, korean, japanese, rime:<schema>
+# Supported: pinyin, korean, japanese, hiragana, katakana, rime:<schema>
+# Japanese variants:
+#   japanese (or japanese-kanji) — romaji → kanji/hiragana/katakana candidates
+#   hiragana (or japanese-hiragana) — romaji → hiragana only
+#   katakana (or japanese-katakana) — romaji → katakana only
 # RIME schemas (requires librime + schema data):
 #   rime:luna_pinyin      — Mandarin pinyin
 #   rime:luna_pinyin_simp — Simplified Chinese pinyin

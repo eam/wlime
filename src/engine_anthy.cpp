@@ -102,15 +102,18 @@ static std::string hira_to_kata(const std::string &hira) {
     return result;
 }
 
+enum class AnthyMode { Kanji, Hiragana, Katakana };
+
 class AnthyEngine : public InputEngine {
     anthy_context_t ctx = nullptr;
     std::string romaji;         // unconverted romaji tail (partial match)
     std::string raw_input;      // full romaji as typed (for preedit display)
     std::string kana;           // converted hiragana
     std::vector<Candidate> candidates_;
+    AnthyMode mode;
 
 public:
-    AnthyEngine() {
+    AnthyEngine(AnthyMode m) : mode(m) {
         if (anthy_init() < 0) {
             fprintf(stderr, "[wlime] failed to init anthy\n");
             return;
@@ -256,7 +259,14 @@ public:
         return raw_input.empty();
     }
 
-    const char *display_name() const override { return "日本語"; }
+    const char *display_name() const override {
+        switch (mode) {
+            case AnthyMode::Hiragana: return "ひらがな";
+            case AnthyMode::Katakana: return "カタカナ";
+            case AnthyMode::Kanji:    return "日本語";
+        }
+        return "日本語";
+    }
     const char *cjk_font() const override { return "Noto Sans CJK JP"; }
 
 private:
@@ -298,15 +308,23 @@ private:
         if (lookup_kana.empty())
             return;
 
-        // First candidate: hiragana as-is
-        candidates_.push_back({lookup_kana});
+        if (mode == AnthyMode::Hiragana) {
+            candidates_.push_back({lookup_kana});
+            return;
+        }
 
-        // Second candidate: katakana
         std::string kata = hira_to_kata(lookup_kana);
+
+        if (mode == AnthyMode::Katakana) {
+            candidates_.push_back({kata});
+            return;
+        }
+
+        // Kanji mode: hiragana, katakana, then kanji from anthy
+        candidates_.push_back({lookup_kana});
         if (kata != lookup_kana)
             candidates_.push_back({kata});
 
-        // Remaining candidates: kanji from anthy
         anthy_set_string(ctx, lookup_kana.c_str());
 
         struct anthy_conv_stat stat;
@@ -335,8 +353,8 @@ private:
     }
 };
 
-InputEngine *create_anthy_engine() {
-    auto *e = new AnthyEngine();
+InputEngine *create_anthy_engine(int mode) {
+    auto *e = new AnthyEngine(static_cast<AnthyMode>(mode));
     if (!e->ok()) {
         delete e;
         return nullptr;
@@ -346,7 +364,8 @@ InputEngine *create_anthy_engine() {
 
 #else
 
-InputEngine *create_anthy_engine() {
+InputEngine *create_anthy_engine(int mode) {
+    (void)mode;
     fprintf(stderr, "[wlime] japanese support not compiled (anthy not found)\n");
     return nullptr;
 }

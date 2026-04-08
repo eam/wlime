@@ -227,6 +227,53 @@ static void kb_key(void *data, struct zwp_input_method_keyboard_grab_v2 *kb,
         return;
     }
 
+    // Try feeding the key to the engine first.
+    // This lets engines like RIME handle space/enter/numbers internally.
+    if (engine->feed_key(sym, utf8)) {
+        // Check if the engine produced a commit (e.g. RIME conversion)
+        std::string committed = engine->check_commit();
+        if (!committed.empty()) {
+            ime_commit_text(ime, committed.c_str(), serial, time);
+            sound_play(SND_COMMIT);
+            overlay_burst_commit(ime->overlay);
+            fprintf(stderr, "[wlime] engine committed: %s\n", committed.c_str());
+
+            // If composition is done, hide overlay
+            if (engine->empty()) {
+                ime->composing = false;
+                overlay_hide(ime->overlay);
+            } else {
+                overlay_set_candidates(ime->overlay, engine->get_preedit(),
+                                       engine->get_candidates());
+            }
+            return;
+        }
+
+        std::string preedit = engine->get_preedit();
+        auto &candidates = engine->get_candidates();
+        overlay_set_candidates(ime->overlay, preedit, candidates);
+        sound_play(SND_KEYSTROKE);
+        overlay_burst_keystroke(ime->overlay);
+
+        // Set preedit so the app shows inline preview
+        if (!candidates.empty()) {
+            zwp_input_method_v2_set_preedit_string(ime->input_method,
+                                                    candidates[0].text.c_str(),
+                                                    0, candidates[0].text.size());
+        } else {
+            zwp_input_method_v2_set_preedit_string(ime->input_method,
+                                                    preedit.c_str(),
+                                                    0, preedit.size());
+        }
+        zwp_input_method_v2_commit(ime->input_method, serial);
+
+        fprintf(stderr, "[wlime] input: %s → %d candidates\n",
+                preedit.c_str(), (int)candidates.size());
+        return;
+    }
+
+    // Engine didn't consume the key — use wlime's default handling
+
     // Number keys 1-9 select a candidate
     if (sym >= XKB_KEY_1 && sym <= XKB_KEY_9) {
         int idx = sym - XKB_KEY_1;
@@ -276,31 +323,6 @@ static void kb_key(void *data, struct zwp_input_method_keyboard_grab_v2 *kb,
                                        engine->get_candidates());
             }
         }
-        return;
-    }
-
-    // Feed key to engine
-    if (engine->feed_key(sym, utf8)) {
-        std::string preedit = engine->get_preedit();
-        auto &candidates = engine->get_candidates();
-        overlay_set_candidates(ime->overlay, preedit, candidates);
-        sound_play(SND_KEYSTROKE);
-        overlay_burst_keystroke(ime->overlay);
-
-        // Set preedit so the app shows inline preview
-        if (!candidates.empty()) {
-            zwp_input_method_v2_set_preedit_string(ime->input_method,
-                                                    candidates[0].text.c_str(),
-                                                    0, candidates[0].text.size());
-        } else {
-            zwp_input_method_v2_set_preedit_string(ime->input_method,
-                                                    preedit.c_str(),
-                                                    0, preedit.size());
-        }
-        zwp_input_method_v2_commit(ime->input_method, serial);
-
-        fprintf(stderr, "[wlime] input: %s → %d candidates\n",
-                preedit.c_str(), (int)candidates.size());
         return;
     }
 
