@@ -10,6 +10,20 @@ gtk_layer_shell = dependency('gtk-layer-shell-0')
 xkbcommon = dependency('xkbcommon')
 cairo = dependency('cairo')
 libpinyin = dependency('libpinyin')
+libhangul = dependency('libhangul', required: false)
+anthy = dependency('anthy', required: false)
+librime = dependency('rime', required: false)
+
+extra_cpp_args = []
+if libhangul.found()
+  extra_cpp_args += '-DHAVE_HANGUL'
+endif
+if anthy.found()
+  extra_cpp_args += '-DHAVE_ANTHY'
+endif
+if librime.found()
+  extra_cpp_args += '-DHAVE_RIME'
+endif
 
 # Protocol code generation
 wl_protocol_dir = '/usr/share/wayland-protocols'
@@ -41,15 +55,31 @@ foreach name, path : protocols
   )
 endforeach
 
+all_deps = [wayland_client, gtk3, gtk_layer_shell, xkbcommon, cairo, libpinyin]
+if libhangul.found()
+  all_deps += libhangul
+endif
+if anthy.found()
+  all_deps += anthy
+endif
+if librime.found()
+  all_deps += librime
+endif
+
 executable('wlime',
   'src/main.cpp',
   'src/overlay.cpp',
   'src/ime.cpp',
   'src/engine.cpp',
+  'src/engine_pinyin.cpp',
+  'src/engine_hangul.cpp',
+  'src/engine_anthy.cpp',
+  'src/engine_rime.cpp',
   'src/config.cpp',
   'src/sound.cpp',
   protocol_sources,
   protocol_headers,
-  dependencies: [wayland_client, gtk3, gtk_layer_shell, xkbcommon, cairo, libpinyin],
+  cpp_args: extra_cpp_args,
+  dependencies: all_deps,
   install: true,
 )

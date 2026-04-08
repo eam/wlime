@@ -1,30 +1,45 @@
 #pragma once
 
-#include <pinyin.h>
 #include <string>
 #include <vector>
-
-struct Engine {
-    pinyin_context_t *ctx;
-    pinyin_instance_t *inst;
-};
+#include <xkbcommon/xkbcommon.h>
 
 struct Candidate {
-    std::string text;           // the Chinese string
-    lookup_candidate_t *raw;    // libpinyin's opaque pointer (valid until next query)
+    std::string text;
 };
 
-// Initialize the pinyin engine. Returns false on failure.
-bool engine_init(Engine *eng);
-void engine_destroy(Engine *eng);
+class InputEngine {
+public:
+    virtual ~InputEngine() = default;
 
-// Feed a raw pinyin string (e.g. "nihao") and get candidates back.
-// Returns the number of candidates (up to max_candidates).
-int engine_query(Engine *eng, const char *pinyin,
-                 std::vector<Candidate> &candidates, int max_candidates = 9);
+    // Process a keystroke. Returns true if consumed (added to composition).
+    virtual bool feed_key(xkb_keysym_t sym, const char *utf8) = 0;
 
-// Tell the engine the user chose this candidate (for learning).
-void engine_select(Engine *eng, int index, const std::vector<Candidate> &candidates);
+    // Handle backspace. Returns true if there was something to delete.
+    virtual bool backspace() = 0;
 
-// Reset the engine state for a new input session.
-void engine_reset(Engine *eng);
+    // Get the current preedit string (shown in overlay as the input buffer).
+    virtual std::string get_preedit() const = 0;
+
+    // Get current candidate list.
+    virtual const std::vector<Candidate> &get_candidates() const = 0;
+
+    // Select candidate by index. Returns the text to commit to the app.
+    virtual std::string select(int index) = 0;
+
+    // Reset all composition state.
+    virtual void reset() = 0;
+
+    // Whether the composition buffer is empty.
+    virtual bool empty() const = 0;
+
+    // Display name for the overlay idle screen (e.g. "pinyin", "한국어", "日本語").
+    virtual const char *display_name() const = 0;
+
+    // CJK font family for candidate rendering.
+    virtual const char *cjk_font() const = 0;
+};
+
+// Factory: creates engine based on language config string.
+// Returns nullptr on failure (logs the reason).
+InputEngine *create_engine(const std::string &language);

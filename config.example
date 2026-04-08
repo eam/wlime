@@ -2,8 +2,14 @@
 # Copy to ~/.config/wlime/config
 
 # Language / input method
-# Supported: pinyin
-# Planned: jyutping (Cantonese), japanese (anthy/mozc), korean (libhangul)
+# Supported: pinyin, korean, japanese, rime:<schema>
+# RIME schemas (requires librime + schema data):
+#   rime:luna_pinyin      — Mandarin pinyin
+#   rime:luna_pinyin_simp — Simplified Chinese pinyin
+#   rime:jyut6ping3       — Cantonese jyutping
+#   rime:bopomofo         — Bopomofo/Zhuyin
+#   rime:cangjie5         — Cangjie
+# Install additional schemas for more languages.
 language = pinyin
 
 # Always copy committed text to clipboard (true/false)

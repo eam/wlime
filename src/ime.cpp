@@ -1,4 +1,5 @@
 #include "wlime.h"
+#include "engine.h"
 #include "input-method-unstable-v2-client-protocol.h"
 #include "virtual-keyboard-unstable-v1-client-protocol.h"
 #include <cstdio>
@@ -93,7 +94,7 @@ static void im_deactivate(void *data, struct zwp_input_method_v2 *im) {
     auto *ime = static_cast<IME *>(data);
     ime->active = false;
     ime->composing = false;
-    ime->buffer.clear();
+    ime->engine->reset();
     overlay_hide(ime->overlay);
     fprintf(stderr, "[wlime] input method deactivated\n");
 }
@@ -177,15 +178,13 @@ static gboolean check_toggle(gpointer data) {
 
     if (ime->composing) {
         ime->composing = false;
-        ime->buffer.clear();
-        ime->candidates.clear();
-        engine_reset(&ime->engine);
+        ime->engine->reset();
         overlay_hide(ime->overlay);
         sound_play(SND_DEACTIVATE);
         fprintf(stderr, "[wlime] composition OFF (SIGUSR1)\n");
     } else {
         ime->composing = true;
-        ime->buffer.clear();
+        ime->engine->reset();
         overlay_show(ime->overlay, "wlime");
         sound_play(SND_ACTIVATE);
         fprintf(stderr, "[wlime] composition ON (SIGUSR1)\n");
@@ -196,6 +195,7 @@ static gboolean check_toggle(gpointer data) {
 static void kb_key(void *data, struct zwp_input_method_keyboard_grab_v2 *kb,
                    uint32_t serial, uint32_t time, uint32_t key, uint32_t state) {
     auto *ime = static_cast<IME *>(data);
+    InputEngine *engine = ime->engine;
 
     // Forward key releases always
     if (state != WL_KEYBOARD_KEY_STATE_PRESSED) {
@@ -215,14 +215,12 @@ static void kb_key(void *data, struct zwp_input_method_keyboard_grab_v2 *kb,
     // --- Composing mode ---
 
     char utf8[8];
-    int len = xkb_state_key_get_utf8(ime->xkb_state, keycode, utf8, sizeof(utf8));
+    xkb_state_key_get_utf8(ime->xkb_state, keycode, utf8, sizeof(utf8));
 
     // Escape cancels composition
     if (sym == XKB_KEY_Escape) {
         ime->composing = false;
-        ime->buffer.clear();
-        ime->candidates.clear();
-        engine_reset(&ime->engine);
+        engine->reset();
         overlay_hide(ime->overlay);
         sound_play(SND_CANCEL);
         fprintf(stderr, "[wlime] composition cancelled\n");
@@ -232,84 +230,77 @@ static void kb_key(void *data, struct zwp_input_method_keyboard_grab_v2 *kb,
     // Number keys 1-9 select a candidate
     if (sym >= XKB_KEY_1 && sym <= XKB_KEY_9) {
         int idx = sym - XKB_KEY_1;
-        if (idx < (int)ime->candidates.size()) {
-            const std::string &chosen = ime->candidates[idx].text;
+        auto &candidates = engine->get_candidates();
+        if (idx < (int)candidates.size()) {
+            std::string chosen = engine->select(idx);
             ime_commit_text(ime, chosen.c_str(), serial, time);
-            engine_select(&ime->engine, idx, ime->candidates);
             sound_play(SND_SELECT);
             overlay_burst_commit(ime->overlay);
             fprintf(stderr, "[wlime] selected candidate %d: %s\n", idx + 1, chosen.c_str());
 
             ime->composing = false;
-            ime->buffer.clear();
-            ime->candidates.clear();
-            engine_reset(&ime->engine);
             overlay_hide(ime->overlay);
             return;
         }
     }
 
-    // Space or Return commits first candidate, or raw buffer if no candidates
+    // Space or Return commits first candidate, or preedit if no candidates
     if (sym == XKB_KEY_Return || sym == XKB_KEY_space) {
-        if (!ime->candidates.empty()) {
-            const std::string &chosen = ime->candidates[0].text;
+        auto &candidates = engine->get_candidates();
+        if (!candidates.empty()) {
+            std::string chosen = engine->select(0);
             ime_commit_text(ime, chosen.c_str(), serial, time);
-            engine_select(&ime->engine, 0, ime->candidates);
             sound_play(SND_COMMIT);
             overlay_burst_commit(ime->overlay);
             fprintf(stderr, "[wlime] committed: %s\n", chosen.c_str());
-        } else if (!ime->buffer.empty()) {
-            ime_commit_text(ime, ime->buffer.c_str(), serial, time);
+        } else if (!engine->empty()) {
+            std::string preedit = engine->get_preedit();
+            ime_commit_text(ime, preedit.c_str(), serial, time);
+            engine->reset();
             sound_play(SND_COMMIT);
             overlay_burst_commit(ime->overlay);
-            fprintf(stderr, "[wlime] committed raw: %s\n", ime->buffer.c_str());
+            fprintf(stderr, "[wlime] committed raw: %s\n", preedit.c_str());
         }
         ime->composing = false;
-        ime->buffer.clear();
-        ime->candidates.clear();
-        engine_reset(&ime->engine);
         overlay_hide(ime->overlay);
         return;
     }
 
-    // Backspace removes last character from pinyin buffer
+    // Backspace
     if (sym == XKB_KEY_BackSpace) {
-        if (!ime->buffer.empty()) {
-            ime->buffer.pop_back(); // pinyin is ASCII, single byte
-            if (ime->buffer.empty()) {
-                ime->candidates.clear();
-                engine_reset(&ime->engine);
+        if (engine->backspace()) {
+            if (engine->empty()) {
                 overlay_set_text(ime->overlay, "wlime");
             } else {
-                engine_query(&ime->engine, ime->buffer.c_str(), ime->candidates);
-                overlay_set_candidates(ime->overlay, ime->buffer, ime->candidates);
+                overlay_set_candidates(ime->overlay, engine->get_preedit(),
+                                       engine->get_candidates());
             }
         }
         return;
     }
 
-    // Lowercase letters — add to pinyin buffer and query engine
-    if (len > 0 && utf8[0] >= 'a' && utf8[0] <= 'z') {
-        ime->buffer.append(utf8, len);
-        engine_query(&ime->engine, ime->buffer.c_str(), ime->candidates);
-        overlay_set_candidates(ime->overlay, ime->buffer, ime->candidates);
+    // Feed key to engine
+    if (engine->feed_key(sym, utf8)) {
+        std::string preedit = engine->get_preedit();
+        auto &candidates = engine->get_candidates();
+        overlay_set_candidates(ime->overlay, preedit, candidates);
         sound_play(SND_KEYSTROKE);
         overlay_burst_keystroke(ime->overlay);
 
         // Set preedit so the app shows inline preview
-        if (!ime->candidates.empty()) {
+        if (!candidates.empty()) {
             zwp_input_method_v2_set_preedit_string(ime->input_method,
-                                                    ime->candidates[0].text.c_str(),
-                                                    0, ime->candidates[0].text.size());
+                                                    candidates[0].text.c_str(),
+                                                    0, candidates[0].text.size());
         } else {
             zwp_input_method_v2_set_preedit_string(ime->input_method,
-                                                    ime->buffer.c_str(),
-                                                    0, ime->buffer.size());
+                                                    preedit.c_str(),
+                                                    0, preedit.size());
         }
         zwp_input_method_v2_commit(ime->input_method, serial);
 
-        fprintf(stderr, "[wlime] pinyin: %s → %d candidates\n",
-                ime->buffer.c_str(), (int)ime->candidates.size());
+        fprintf(stderr, "[wlime] input: %s → %d candidates\n",
+                preedit.c_str(), (int)candidates.size());
         return;
     }
 

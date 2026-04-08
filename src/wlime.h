@@ -9,9 +9,12 @@
 #include <string>
 #include <vector>
 
-#include "engine.h"
 #include "config.h"
 #include "sound.h"
+
+// Forward declaration
+class InputEngine;
+struct Candidate;
 
 // Forward declarations for generated protocol types
 struct zwlr_layer_shell_v1;
@@ -59,6 +62,10 @@ struct Overlay {
     double global_hue;      // cycles for rainbow mode
     double time_counter;    // for animations
 
+    // Language display
+    std::string language_name;  // e.g. "pinyin", "한국어", "日本語"
+    std::string cjk_font_name; // e.g. "Noto Sans CJK SC"
+
     Config *config;
 };
 
@@ -95,10 +102,8 @@ struct IME {
     bool active;            // compositor says a text input is focused
     bool composing;         // user has toggled composition mode
     volatile bool toggle_requested; // set by SIGUSR1 handler
-    std::string buffer;     // current composition buffer (e.g. "ni hao")
 
-    Engine engine;
-    std::vector<Candidate> candidates;
+    InputEngine *engine;
 
     Config *config;
     Overlay *overlay;

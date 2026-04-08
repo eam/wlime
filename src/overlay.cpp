@@ -1,4 +1,5 @@
 #include "wlime.h"
+#include "engine.h"
 #include <cstdio>
 #include <cmath>
 #include <cstdlib>
@@ -428,20 +429,21 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
                               fade(TITLE, op), fade(IDLE_GLOW, op), title_size);
         }
 
+        std::string subtitle = "[ " + ov->language_name + " input active ]";
         cairo_set_font_size(cr, 22.0);
-        cairo_text_extents(cr, "[ pinyin input active ]", &ext);
+        cairo_text_extents(cr, subtitle.c_str(), &ext);
         double sx = (w - ext.width) / 2.0 - ext.x_bearing;
         Color sub = fade(CAND_DIM, op);
         cairo_set_source_rgba(cr, sub.r, sub.g, sub.b, sub.a * 0.7);
         cairo_move_to(cr, sx, ty + 60);
-        cairo_show_text(cr, "[ pinyin input active ]");
+        cairo_show_text(cr, subtitle.c_str());
 
         return FALSE;
     }
 
     // --- Composing mode ---
 
-    cairo_select_font_face(cr, "monospace",
+    cairo_select_font_face(cr, ov->cjk_font_name.c_str(),
                            CAIRO_FONT_SLANT_NORMAL,
                            CAIRO_FONT_WEIGHT_BOLD);
     double pin_size = 44.0;
@@ -469,7 +471,7 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
         return FALSE;
 
     // --- Candidates ---
-    cairo_select_font_face(cr, "Noto Sans CJK SC",
+    cairo_select_font_face(cr, ov->cjk_font_name.c_str(),
                            CAIRO_FONT_SLANT_NORMAL,
                            CAIRO_FONT_WEIGHT_BOLD);
 
@@ -495,7 +497,7 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
         cairo_move_to(cr, cx - nxt.width - 15, cand_start_y);
         cairo_show_text(cr, "1.");
 
-        cairo_select_font_face(cr, "Noto Sans CJK SC",
+        cairo_select_font_face(cr, ov->cjk_font_name.c_str(),
                                CAIRO_FONT_SLANT_NORMAL,
                                CAIRO_FONT_WEIGHT_BOLD);
 
@@ -536,7 +538,7 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
             cairo_text_extents_t lext;
             cairo_text_extents(cr, label, &lext);
 
-            cairo_select_font_face(cr, "Noto Sans CJK SC",
+            cairo_select_font_face(cr, ov->cjk_font_name.c_str(),
                                    CAIRO_FONT_SLANT_NORMAL,
                                    CAIRO_FONT_WEIGHT_BOLD);
             cairo_set_font_size(cr, small_size);
@@ -564,7 +566,7 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
             cairo_show_text(cr, layouts[i].label.c_str());
             rx += layouts[i].label_w + 8;
 
-            cairo_select_font_face(cr, "Noto Sans CJK SC",
+            cairo_select_font_face(cr, ov->cjk_font_name.c_str(),
                                    CAIRO_FONT_SLANT_NORMAL,
                                    CAIRO_FONT_WEIGHT_BOLD);
             cairo_set_font_size(cr, small_size);
