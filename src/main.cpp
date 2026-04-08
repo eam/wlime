@@ -62,7 +62,10 @@ int main(int argc, char *argv[]) {
     IME ime = {};
     ime.engine = engine;
     ime_init(&ime, &overlay, &config);
-    control_init(&ime);
+    if (!control_init(&ime)) {
+        delete engine;
+        return 1;
+    }
 
     gtk_main();
 

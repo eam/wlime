@@ -6,7 +6,8 @@ struct IME;
 
 // Start the control socket server at $XDG_RUNTIME_DIR/wlime.sock.
 // Integrates into the GLib main loop. Call after ime_init().
-void control_init(IME *ime);
+// Returns false and prints an error if another instance is already running.
+bool control_init(IME *ime);
 
 // Clean up the socket file and fd.
 void control_destroy();

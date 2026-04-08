@@ -123,17 +123,14 @@ static gboolean on_new_connection(GIOChannel *, GIOCondition, gpointer) {
 
 // --- Public API ---
 
-void control_init(IME *ime) {
+bool control_init(IME *ime) {
     g_ctrl_ime = ime;
     socket_path = get_socket_path();
-
-    // Remove stale socket from a previous crash
-    unlink(socket_path.c_str());
 
     server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (server_fd < 0) {
         perror("[wlime] control socket");
-        return;
+        return false;
     }
 
     struct sockaddr_un addr = {};
@@ -141,10 +138,27 @@ void control_init(IME *ime) {
     strncpy(addr.sun_path, socket_path.c_str(), sizeof(addr.sun_path) - 1);
 
     if (bind(server_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        perror("[wlime] control bind");
-        close(server_fd);
-        server_fd = -1;
-        return;
+        // Bind failed — check if an existing instance is alive
+        int probe = socket(AF_UNIX, SOCK_STREAM, 0);
+        if (probe >= 0 && connect(probe, (struct sockaddr *)&addr, sizeof(addr)) == 0) {
+            // Connection succeeded — another wlime is running
+            close(probe);
+            close(server_fd);
+            server_fd = -1;
+            fprintf(stderr, "[wlime] another instance is already running\n");
+            return false;
+        }
+        if (probe >= 0)
+            close(probe);
+
+        // Stale socket from a crash — remove and retry
+        unlink(socket_path.c_str());
+        if (bind(server_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+            perror("[wlime] control bind");
+            close(server_fd);
+            server_fd = -1;
+            return false;
+        }
     }
 
     if (listen(server_fd, 4) < 0) {
@@ -152,7 +166,7 @@ void control_init(IME *ime) {
         close(server_fd);
         server_fd = -1;
         unlink(socket_path.c_str());
-        return;
+        return false;
     }
 
     GIOChannel *chan = g_io_channel_unix_new(server_fd);
@@ -160,6 +174,7 @@ void control_init(IME *ime) {
     g_io_channel_unref(chan);
 
     fprintf(stderr, "[wlime] control socket: %s\n", socket_path.c_str());
+    return true;
 }
 
 void control_destroy() {

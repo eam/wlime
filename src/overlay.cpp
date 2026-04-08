@@ -430,6 +430,9 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
         }
 
         std::string subtitle = "[ " + ov->language_name + " input active ]";
+        cairo_select_font_face(cr, ov->cjk_font_name.c_str(),
+                               CAIRO_FONT_SLANT_NORMAL,
+                               CAIRO_FONT_WEIGHT_NORMAL);
         cairo_set_font_size(cr, 22.0);
         cairo_text_extents(cr, subtitle.c_str(), &ext);
         double sx = (w - ext.width) / 2.0 - ext.x_bearing;
