@@ -37,12 +37,14 @@ ninja -C build
 ./build/wlime
 
 # Toggle composition mode (bind this in hyprland.conf)
-pkill -USR1 wlime
+wlime toggle
+wlime languages
+wlime switch <one of the languages>
 ```
 
 Hyprland keybind example:
 ```
-bind = SUPER, space, exec, pkill -USR1 wlime
+bind = SUPER, space, exec, wlime toggle
 ```
 
 When composition mode is active:
@@ -57,7 +59,7 @@ When composition mode is active:
 Copy `config.example` to `~/.config/wlime/config`:
 
 ```
-language = pinyin
+language = rime:luna_pinyin_simp
 clipboard_always = true
 sounds = true
 animate = true
