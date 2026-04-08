@@ -51,13 +51,13 @@ static void synthesize_paste(IME *ime, uint32_t time) {
 }
 
 // Commit text to the focused app
-static void ime_commit_text(IME *ime, const char *text, uint32_t serial, uint32_t time) {
+static void ime_commit_text(IME *ime, const char *text, uint32_t time) {
     bool xwayland = is_xwayland_focused();
 
     // Always try the protocol path for native Wayland apps
     if (!xwayland) {
         zwp_input_method_v2_commit_string(ime->input_method, text);
-        zwp_input_method_v2_commit(ime->input_method, serial);
+        zwp_input_method_v2_commit(ime->input_method, ime->done_serial);
     }
 
     // Clipboard: always copy if configured, or paste for XWayland
@@ -104,8 +104,8 @@ static void im_content_type(void *data, struct zwp_input_method_v2 *im,
 }
 
 static void im_done(void *data, struct zwp_input_method_v2 *im) {
-    // Compositor is done sending state updates for this cycle
-    fprintf(stderr, "[wlime] input method done event\n");
+    auto *ime = static_cast<IME *>(data);
+    ime->done_serial++;
 }
 
 static void im_unavailable(void *data, struct zwp_input_method_v2 *im) {
@@ -193,13 +193,36 @@ static void kb_key(void *data, struct zwp_input_method_keyboard_grab_v2 *kb,
         return;
     }
 
+    // Enter always commits first candidate (or preedit) — don't let
+    // engines handle it (RIME's Enter commits raw roman text instead).
+    if (sym == XKB_KEY_Return) {
+        auto &candidates = engine->get_candidates();
+        if (!candidates.empty()) {
+            std::string chosen = engine->select(0);
+            ime_commit_text(ime, chosen.c_str(), time);
+            sound_play(SND_COMMIT);
+            overlay_burst_commit(ime->overlay);
+            fprintf(stderr, "[wlime] committed: %s\n", chosen.c_str());
+        } else if (!engine->empty()) {
+            std::string preedit = engine->get_preedit();
+            ime_commit_text(ime, preedit.c_str(), time);
+            engine->reset();
+            sound_play(SND_COMMIT);
+            overlay_burst_commit(ime->overlay);
+            fprintf(stderr, "[wlime] committed raw: %s\n", preedit.c_str());
+        }
+        ime->composing = false;
+        overlay_hide(ime->overlay);
+        return;
+    }
+
     // Try feeding the key to the engine first.
-    // This lets engines like RIME handle space/enter/numbers internally.
+    // This lets engines like RIME handle space/numbers internally.
     if (engine->feed_key(sym, utf8)) {
         // Check if the engine produced a commit (e.g. RIME conversion)
         std::string committed = engine->check_commit();
         if (!committed.empty()) {
-            ime_commit_text(ime, committed.c_str(), serial, time);
+            ime_commit_text(ime, committed.c_str(), time);
             sound_play(SND_COMMIT);
             overlay_burst_commit(ime->overlay);
             fprintf(stderr, "[wlime] engine committed: %s\n", committed.c_str());
@@ -231,7 +254,7 @@ static void kb_key(void *data, struct zwp_input_method_keyboard_grab_v2 *kb,
                                                     preedit.c_str(),
                                                     0, preedit.size());
         }
-        zwp_input_method_v2_commit(ime->input_method, serial);
+        zwp_input_method_v2_commit(ime->input_method, ime->done_serial);
 
         fprintf(stderr, "[wlime] input: %s → %d candidates\n",
                 preedit.c_str(), (int)candidates.size());
@@ -246,7 +269,7 @@ static void kb_key(void *data, struct zwp_input_method_keyboard_grab_v2 *kb,
         auto &candidates = engine->get_candidates();
         if (idx < (int)candidates.size()) {
             std::string chosen = engine->select(idx);
-            ime_commit_text(ime, chosen.c_str(), serial, time);
+            ime_commit_text(ime, chosen.c_str(), time);
             sound_play(SND_SELECT);
             overlay_burst_commit(ime->overlay);
             fprintf(stderr, "[wlime] selected candidate %d: %s\n", idx + 1, chosen.c_str());
@@ -257,18 +280,19 @@ static void kb_key(void *data, struct zwp_input_method_keyboard_grab_v2 *kb,
         }
     }
 
-    // Space or Return commits first candidate, or preedit if no candidates
-    if (sym == XKB_KEY_Return || sym == XKB_KEY_space) {
+    // Space commits first candidate, or preedit if no candidates
+    // (Return is handled above before feed_key)
+    if (sym == XKB_KEY_space) {
         auto &candidates = engine->get_candidates();
         if (!candidates.empty()) {
             std::string chosen = engine->select(0);
-            ime_commit_text(ime, chosen.c_str(), serial, time);
+            ime_commit_text(ime, chosen.c_str(), time);
             sound_play(SND_COMMIT);
             overlay_burst_commit(ime->overlay);
             fprintf(stderr, "[wlime] committed: %s\n", chosen.c_str());
         } else if (!engine->empty()) {
             std::string preedit = engine->get_preedit();
-            ime_commit_text(ime, preedit.c_str(), serial, time);
+            ime_commit_text(ime, preedit.c_str(), time);
             engine->reset();
             sound_play(SND_COMMIT);
             overlay_burst_commit(ime->overlay);
@@ -440,6 +464,7 @@ void ime_init(IME *ime, Overlay *ov, Config *cfg) {
     ime->config = cfg;
     ime->active = false;
     ime->composing = false;
+    ime->done_serial = 0;
     ime->xkb_ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
     ime->xkb_keymap = nullptr;
     ime->xkb_state = nullptr;

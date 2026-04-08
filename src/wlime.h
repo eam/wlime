@@ -101,6 +101,7 @@ struct IME {
 
     bool active;            // compositor says a text input is focused
     bool composing;         // user has toggled composition mode
+    uint32_t done_serial;   // count of im_done events (used for commit serial)
 
     InputEngine *engine;
 
