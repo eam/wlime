@@ -7,11 +7,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <cerrno>
-#include <csignal>
 #include <cstdlib>
-
-// Global pointer for signal handler (only one IME instance)
-static IME *g_ime = nullptr;
 
 // Check if the currently focused window is an XWayland client
 static bool is_xwayland_focused() {
@@ -74,13 +70,6 @@ static void ime_commit_text(IME *ime, const char *text, uint32_t serial, uint32_
     fprintf(stderr, "[wlime] committed: %s (xwayland=%d clipboard=%d)\n",
             text, xwayland, ime->config->clipboard_always);
 }
-
-static void sigusr1_handler(int) {
-    // Signal handler sets a flag; actual toggle happens in the main loop
-    if (g_ime)
-        g_ime->toggle_requested = true;
-}
-
 
 // --- Input method listeners ---
 
@@ -168,29 +157,6 @@ static void kb_keymap(void *data, struct zwp_input_method_keyboard_grab_v2 *kb,
     fprintf(stderr, "[wlime] keyboard keymap loaded\n");
 }
 
-// Check for toggle signal from the GLib main loop
-static gboolean check_toggle(gpointer data) {
-    auto *ime = static_cast<IME *>(data);
-    if (!ime->toggle_requested)
-        return TRUE; // keep polling
-
-    ime->toggle_requested = false;
-
-    if (ime->composing) {
-        ime->composing = false;
-        ime->engine->reset();
-        overlay_hide(ime->overlay);
-        sound_play(SND_DEACTIVATE);
-        fprintf(stderr, "[wlime] composition OFF (SIGUSR1)\n");
-    } else {
-        ime->composing = true;
-        ime->engine->reset();
-        overlay_show(ime->overlay, "wlime");
-        sound_play(SND_ACTIVATE);
-        fprintf(stderr, "[wlime] composition ON (SIGUSR1)\n");
-    }
-    return TRUE;
-}
 
 static void kb_key(void *data, struct zwp_input_method_keyboard_grab_v2 *kb,
                    uint32_t serial, uint32_t time, uint32_t key, uint32_t state) {
@@ -474,7 +440,6 @@ void ime_init(IME *ime, Overlay *ov, Config *cfg) {
     ime->config = cfg;
     ime->active = false;
     ime->composing = false;
-    ime->toggle_requested = false;
     ime->xkb_ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
     ime->xkb_keymap = nullptr;
     ime->xkb_state = nullptr;
@@ -524,17 +489,7 @@ void ime_init(IME *ime, Overlay *ov, Config *cfg) {
     g_source_add_poll(source, &ws->pfd);
     g_source_attach(source, nullptr);
 
-    // SIGUSR1 toggles composition mode
-    g_ime = ime;
-    struct sigaction sa = {};
-    sa.sa_handler = sigusr1_handler;
-    sa.sa_flags = SA_RESTART;
-    sigaction(SIGUSR1, &sa, nullptr);
-
-    // Poll for toggle signal every 50ms
-    g_timeout_add(50, check_toggle, ime);
-
-    fprintf(stderr, "[wlime] IME initialized (pid=%d), SIGUSR1 toggles composition\n", getpid());
+    fprintf(stderr, "[wlime] IME initialized\n");
 }
 
 void ime_destroy(IME *ime) {

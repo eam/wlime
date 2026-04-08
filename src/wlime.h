@@ -101,7 +101,6 @@ struct IME {
 
     bool active;            // compositor says a text input is focused
     bool composing;         // user has toggled composition mode
-    volatile bool toggle_requested; // set by SIGUSR1 handler
 
     InputEngine *engine;
 
