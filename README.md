@@ -29,6 +29,9 @@ wlime replaces traditional IME popup menus with a translucent fullscreen overlay
 meson setup build
 ninja -C build
 ```
+```
+yay -S wlime-git
+```
 
 ## Usage
 
