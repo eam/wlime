@@ -73,6 +73,7 @@ sparkle = true
 ## Screenshots
 
 ![wlime over doom](wlime-doom.png)
+![wlime sparkle animation](sparkle-wlime.mp4)
 
 ## Architecture
 
