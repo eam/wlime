@@ -8,10 +8,10 @@ wlime replaces traditional IME popup menus with a translucent fullscreen overlay
 
 - **Fullscreen overlay** with CRT scanlines, neon glow text, and rainbow particle effects
 - **Pinyin input** powered by libpinyin with candidate selection (1-9, Space, Enter)
-- **Works everywhere** — native Wayland apps via input-method-v2, XWayland apps via clipboard+paste fallback
-- **Sound effects** — arcade blips on keystrokes, commits, and toggles
+- **Works everywhere** — native Wayland apps via input-method-v2, XWayland apps, and clipboard+paste fallback
+- **Sound effects** — arcade blips on keystrokes, commits, and toggles.
 - **Sparkle mode** — rainbow cycling, impact bursts on keystrokes, celebration explosions on commit
-- **Configurable** — toggle sounds, animations, sparkle mode, clipboard behavior
+- **Configurable** — Sound and sparkles optional. Multiple backends, incl RIME.
 
 ## Dependencies
 
