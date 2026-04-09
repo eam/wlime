@@ -15,7 +15,7 @@ wlime replaces traditional IME popup menus with a translucent fullscreen overlay
 
 ## Dependencies
 
-- Hyprland (tested on 0.54.2)
+- A wayland compositor (tested on hyprland and sway)
 - GTK 3, gtk-layer-shell
 - libpinyin
 - wayland-client, xkbcommon, cairo
